@@ -1,0 +1,93 @@
+---
+title: "Practical Machine Learning - Prediction Assignment"
+author: "Volety Sai Sirisha"
+date: "11 October 2020"
+output: html_document
+---
+
+## Overview
+The aim of this project is to predict the manner in which participants perform a exercises. The data comes from http://groupware.les.inf.puc-rio.br/har wherein 6 participants were asked to perform the same set of exercises correctly and incorrectly.
+
+## Training Data and Testing Data
+The training data is taken from:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv
+
+The testing data is taken from:
+https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv
+
+## Load Packages
+```{r package}
+set.seed(1000)
+library(caret)
+library(ggplot2)
+library(corrplot)
+library(rpart)
+library(randomForest)
+library(rattle)
+library(rpart.plot)
+```
+
+## Load and Partition Data
+```{r load}
+#Loading the training data
+train_data <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"))
+#Loading the test data
+test_data <- read.csv(url("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"))
+
+label <- createDataPartition(train_data$classe, p = 0.7, list = FALSE) #partition data
+training <- train_data[label, ]
+testing <- train_data[-label, ]
+```
+
+## Cleaning data
+From the 160 variables there are some NA values and Zero Variance that have to be removed.
+```{r clean data}
+nzv <- nearZeroVar(training) #Zero variance 
+training <- training[ ,-nzv]
+testing <- testing[ ,-nzv] 
+
+label <- apply(training, 2, function(x) mean(is.na(x))) > 0.95  #NA values
+training <- training[, -which(label, label == FALSE)]
+testing <- testing[, -which(label, label == FALSE)]
+
+training <- training[ , -(1:5)]  #Remove the other 5 variables
+testing <- testing[,-c(1:5)]
+
+dim(training) #Check the dimension of the train data
+dim(testing)  #Check the dimension of the test data 
+```
+
+## Exploratory Analysis
+From the graph we observe that the darker gradient corresponds to having higher correlation.
+```{r analysis}
+corrMat <- cor(training[,-54])
+corrplot(corrMat, method = "color", type = "upper", tl.cex = 0.8, tl.col = rgb(1,0,1))
+```
+
+## Training the Models using different methods
+We will be using 2 different model to train the data to observe the affects. The 2 types are : Decision Tree, Random Forests.
+A) Decision Tree
+```{r Decision Tree}
+model_DecT <- rpart(classe ~ ., data = training, method = "class")
+predict_DecT <- predict(model_DecT, testing, type = "class")
+confMat_DecT <- confusionMatrix(predict_DecT, testing$classe)
+confMat_DecT
+```
+B)Random Forest
+```{r random forest}
+ctrl <- trainControl(method = "cv", number = 3, verboseIter=FALSE)
+model_RanF <- train(classe ~ ., data = training, method = "rf", trControl = ctrl)
+predict_RanF <- predict(model_RanF, testing)
+confMat_RanF <- confusionMatrix(predict_RanF, testing$classe)
+confMat_RanF
+```
+
+We see that the accuracy of Random Forest is better than Decision Tree. Therefore we use Random forest to predicts the results.
+
+## Predicting the test output
+```{r output}
+predict_RanF <- predict(model_RanF, test_data)
+predict_RanF
+```
+
+
